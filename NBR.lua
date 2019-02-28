@@ -508,46 +508,57 @@ function AuraLog()
 	end
 	
 	--NBR_Print("Aura event fired! Difference since last check:")
-	
-	
+		
 	--Move last buff list to previous in order to log changes
 	NBR_PreviousBuffs = NBR_CurrentBuffs
 	NBR_CurrentBuffs = {}
 	NBR_CurrentNumBuffs = 0
+
 	
+	--Get accurate count of buffs for later tooltip scan
+	--Potential duplicate count with NBR_CurrentNumBuffs, but the buff/debuff function behavior is so weird I'm not confident in merging without more testing
+	local buffCount = CountBuffs("player") 
 	
-	--retrieve proper buff names from player via tooltip example
-	--[[
-	GameTooltip:SetOwner(WorldFrame) 
-	for i=1,32 do 
-		GameTooltip:SetPlayerBuff(i) 
-		if GameTooltipTextLeft1:GetText() then 
-			DEFAULT_CHAT_FRAME:AddMessage(i.."="..GameTooltipTextLeft1:GetText(),0.4,1,1) 
-		end 
-	end
-	--]]
+	--SetPlayerBuff returns correct buff ids for CancelPlayerBuff, but does not differentiate between buffs and debuffs
+	--SetUnitBuff ignores debuffs, but doesn't return correct buff ids
+	--FRIENDLY + HOSTILE filters exist but do not function properly
+	--As a workaround we first construct a list of current buff names using SetUnitBuff
+	--The list of names is then used with SetPlayerBuff to determine if each is a buff or debuff
 	
-	--retrieve proper buff names and count buffs and store store each buff slotID in a table
-	GameTooltip:SetOwner(WorldFrame) 
-	for i=0,32 do
-		GameTooltip:SetPlayerBuff(i) 
-		if GameTooltipTextLeft1:GetText() then 
-			GameTooltip:SetPlayerBuff(i) 
-			NBR_CurrentBuffs[i] = GameTooltipTextLeft1:GetText()
-			NBR_CurrentNumBuffs = NBR_CurrentNumBuffs + 1
+	--uses Tooltip:SetUnitBuff to scan tooltips of all buffs and record their names
+	local buffList = {}
+	for i=1,buffCount + 1 do --may not need the +1.  residual from previous changes and hasn't been tested without
+		GameTooltip:SetOwner(WorldFrame) 
+		GameTooltip:SetUnitBuff("player",i) 
+		local buffName = GameTooltipTextLeft1:GetText()
+		if buffName then
+			buffList[buffName] = i
 		else
-			break
+			break		
 		end 
 	end
 	
-	--BACKWARDS
-	--/run for i=33,1,-1 do Print(NBR_Profile[i]) end
+	--count buffs and store each buff slotID in a table
+	GameTooltip:SetOwner(WorldFrame) 
+	for i=0,64 do
+		GameTooltip:SetPlayerBuff(i) 
+		local buffName = GameTooltipTextLeft1:GetText()
+		if buffName then
+			if buffList[buffName] then
+				NBR_CurrentBuffs[i] = buffName
+				NBR_CurrentNumBuffs = NBR_CurrentNumBuffs + 1
+			else
+				NBR_CurrentBuffs[i] = "DEBUFF_FAILURE_DO_NOT_NAME_THIS" --Make this a set constant
+			end
+		end 
+	end
 	
-	--check if got too many buffs
+	--If buff count exceeds threshold, remove the single lowest priority buff
+	--Currently, buffs not found in priority list will not be removed
 	local breakout = false
 	if NBR_CurrentNumBuffs > NBR_Options["Threshold"]+1-1 then
 		for j=getn(NBR_CurrentProfile),1,-1 do
-			for i=1,getn(NBR_CurrentBuffs) do
+			for i=0,getn(NBR_CurrentBuffs) do
 				--NBR_Print("Looping through i: "..i.." and "..j)
 				if NBR_CurrentBuffs[i] == NBR_CurrentProfile[j] then
 					if NBR_Options["Notifications"] == true then
@@ -565,22 +576,6 @@ function AuraLog()
 	end
 	
 	
-	
-	
-	
-	--[[
-	GameTooltip:SetOwner(WorldFrame) 
-	for i=1,32 do
-		local buff=UnitBuff("player",i)
-		if buff then 
-			GameTooltip:SetPlayerBuff(i) 
-			NBR_CurrentBuffs[i] = GameTooltipTextLeft1:GetText()
-			NBR_CurrentNumBuffs = NBR_CurrentNumBuffs + 1
-		else
-			break
-		end 
-	end
-	--]]
 	
 	--Compare difference testing (not really needed but trying to learn)
 	--NBR_DifferentBuffs = TableComp(NBR_CurrentBuffs,NBR_PreviousBuffs)
@@ -616,6 +611,18 @@ function AuraLog()
 	--log change in current buffs
 	
 	--
+end
+
+
+function CountBuffs(unit)
+	local buffCount = 0
+	for i=1,32 do
+		if UnitBuff(unit,i) then
+			buffCount = buffCount + 1
+		end
+	end
+	
+	return buffCount
 end
 
 function PrintCurrentBuffs()
