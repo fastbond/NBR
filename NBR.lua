@@ -1,6 +1,7 @@
 NBRVersion = "Version 2017-09-14"
 NBR_IS_LOADED = false
 NBR_CurrentNumBuffs = 0
+local NBR_DEBUFF_ERROR_MESSAGE = "DEBUFF_FAIL"
 
 --Slash commands
 SlashCmdList["SLASH_NBR"] = function(Flag) end
@@ -548,7 +549,7 @@ function AuraLog()
 				NBR_CurrentBuffs[i] = buffName
 				NBR_CurrentNumBuffs = NBR_CurrentNumBuffs + 1
 			else
-				NBR_CurrentBuffs[i] = "DEBUFF_FAILURE_DO_NOT_NAME_THIS" --Make this a set constant
+				NBR_CurrentBuffs[i] = NBR_DEBUFF_ERROR_MESSAGE
 			end
 		end 
 	end
@@ -898,8 +899,12 @@ function NBR_MinimapButton_SetPositionAngle(pAngle)
 			GameTooltip:AddLine("Current Profile: "..NBR_CurrentProfileName,0,1,0)
 			GameTooltip:AddLine("Current removal Threshold: "..NBR_Options["Threshold"],1,0.55,0.55)
 			GameTooltip:AddLine("Current number of buffs: "..NBR_CurrentNumBuffs.."/32",1,1,1)
-			for i=0,NBR_CurrentNumBuffs do
-				GameTooltip:AddLine(NBR_CurrentBuffs[i],1,1,1)
+			local i=0
+			while i <= table.getn(NBR_CurrentBuffs) do --Currently under the assumption buff numbering is always linear. If not, need to go to 64 or count debuffs.
+				if NBR_CurrentBuffs[i] ~= NBR_DEBUFF_ERROR_MESSAGE then
+					GameTooltip:AddLine(NBR_CurrentBuffs[i],1,1,1)
+				end
+				i = i+1
 			end
 		else
 			GameTooltip:AddLine("NBR is Disabled",1,0,0)
